@@ -109,6 +109,84 @@
       background: transparent !important;
       border: none !important;
     }
+
+    /* Modern popup styling */
+    .custom-popup {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 200px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .custom-popup-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .custom-popup-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #e0e0e0;
+    }
+
+    .custom-popup-info {
+      flex: 1;
+    }
+
+    .custom-popup-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 4px 0;
+    }
+
+    .custom-popup-state {
+      font-size: 13px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .custom-popup-state-icon {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Leaflet popup customization */
+    .leaflet-popup-content-wrapper {
+      padding: 0;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .leaflet-popup-content {
+      margin: 0;
+      min-width: 200px;
+    }
+
+    .leaflet-popup-tip {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Google Maps InfoWindow styling */
+    .gm-style .gm-style-iw-c {
+      padding: 0 !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+
+    .gm-style .gm-style-iw-d {
+      overflow: hidden !important;
+    }
   </style>
 </head>
 <body>
@@ -192,6 +270,7 @@ let lastUpdate = null;
 let updateCount = 0;
 let initialViewSet = false;
 let isOSM = MAP_PROVIDER === 'osm';
+let currentPopup = null; // Track currently open popup
 
 // OpenStreetMap initialization
 function initOSM() {
@@ -317,6 +396,28 @@ function createMarkerHTML(personState, activityState, pictureUrl) {
   `;
 }
 
+function createPopupHTML(friendlyName, personState, pictureUrl, zoneColor) {
+  const stateLabel = personState.charAt(0).toUpperCase() + personState.slice(1).replace(/_/g, ' ');
+
+  return `
+    <div class="custom-popup">
+      <div class="custom-popup-header">
+        <img
+          src="${pictureUrl}"
+          class="custom-popup-avatar"
+          onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><circle cx=%2224%22 cy=%2224%22 r=%2220%22 fill=%22%23cccccc%22/></svg>'">
+        <div class="custom-popup-info">
+          <h3 class="custom-popup-name">${friendlyName}</h3>
+          <div class="custom-popup-state">
+            <span class="custom-popup-state-icon" style="background: ${zoneColor}"></span>
+            ${stateLabel}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function updateMarker(entityId, data) {
   const lat = data.attributes.latitude;
   const lon = data.attributes.longitude;
@@ -344,14 +445,14 @@ function updateMarker(entityId, data) {
 // OpenStreetMap marker update
 function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, pictureUrl) {
   const friendlyName = data.attributes.friendly_name || entityId;
-  const activityLabel = activityState.replace(/_/g, ' ');
+  const zoneConfig = ZONES[personState] || ZONES.not_home || { color: '#757575' };
 
   if (markers[entityId]) {
     // Update existing marker
     markers[entityId].setLatLng([lat, lon]);
 
     // Update popup content
-    const popupContent = `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`;
+    const popupContent = createPopupHTML(friendlyName, personState, pictureUrl, zoneConfig.color);
     markers[entityId].setPopupContent(popupContent);
 
     // Update icon HTML
@@ -361,7 +462,7 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
       html: iconHtml,
       iconSize: [48, 62],
       iconAnchor: [24, 62],
-      popupAnchor: [0, -62]
+      popupAnchor: [0, -68]
     }));
   } else {
     // Create new marker
@@ -371,13 +472,21 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
       html: iconHtml,
       iconSize: [48, 62],
       iconAnchor: [24, 62],
-      popupAnchor: [0, -62]
+      popupAnchor: [0, -68]
     });
 
     const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
 
-    const popupContent = `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`;
+    const popupContent = createPopupHTML(friendlyName, personState, pictureUrl, zoneConfig.color);
     marker.bindPopup(popupContent);
+
+    // Close other popups when this one opens
+    marker.on('popupopen', function() {
+      if (currentPopup && currentPopup !== marker) {
+        currentPopup.closePopup();
+      }
+      currentPopup = marker;
+    });
 
     markers[entityId] = marker;
   }
@@ -388,6 +497,8 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
 // Google Maps marker update
 function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState, pictureUrl) {
   const position = { lat: lat, lng: lon };
+  const friendlyName = data.attributes.friendly_name || entityId;
+  const zoneConfig = ZONES[personState] || ZONES.not_home || { color: '#757575' };
 
   if (markers[entityId]) {
     // Update existing marker
@@ -397,6 +508,11 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
     const overlayDiv = markers[entityId].overlayDiv;
     if (overlayDiv) {
       overlayDiv.innerHTML = createMarkerHTML(personState, activityState, pictureUrl);
+    }
+
+    // Update info window content
+    if (markers[entityId].infoWindow) {
+      markers[entityId].infoWindow.setContent(createPopupHTML(friendlyName, personState, pictureUrl, zoneConfig.color));
     }
   } else {
     // Create custom HTML overlay
@@ -418,8 +534,14 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
 
         // Add click event for info window
         div.addEventListener('click', () => {
+          // Close currently open popup
+          if (currentPopup && currentPopup !== this.infoWindow) {
+            currentPopup.close();
+          }
+
           if (this.infoWindow) {
             this.infoWindow.open(this.getMap());
+            currentPopup = this.infoWindow;
           }
         });
 
@@ -458,9 +580,6 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
       }
     }
 
-    const friendlyName = data.attributes.friendly_name || entityId;
-    const activityLabel = activityState.replace(/_/g, ' ');
-
     const marker = new CustomMarker(
       position,
       createMarkerHTML(personState, activityState, pictureUrl),
@@ -469,10 +588,11 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
 
     marker.setMap(map);
 
-    // Create info window
+    // Create info window with modern popup
     const infoWindow = new google.maps.InfoWindow({
-      content: `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`,
-      position: position
+      content: createPopupHTML(friendlyName, personState, pictureUrl, zoneConfig.color),
+      position: position,
+      pixelOffset: new google.maps.Size(0, -68)
     });
 
     marker.infoWindow = infoWindow;
