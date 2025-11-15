@@ -14,7 +14,51 @@
     .custom-marker-wrapper {
       position: relative;
       width: 48px;
-      height: 48px;
+      height: 62px; /* Increased to accommodate pointer shape */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .custom-marker-position-circle {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 1;
+    }
+
+    .custom-marker-profile-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 48px;
+      height: 54px;
+      z-index: 2;
+    }
+
+    .custom-marker-image-container {
+      width: 48px;
+      height: 54px;
+      position: relative;
+    }
+
+    .custom-marker-image-container::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 8px solid var(--border-color, #757575);
+      z-index: 1;
     }
 
     .custom-marker-image {
@@ -36,6 +80,7 @@
       font-size: 12px;
       color: white;
       box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      z-index: 3;
     }
 
     #refresh-button {
@@ -255,14 +300,19 @@ function createMarkerHTML(personState, activityState, pictureUrl) {
 
   return `
     <div class="custom-marker-wrapper">
-      <img
-        src="${pictureUrl}"
-        class="custom-marker-image"
-        style="border: 3px solid ${zoneConfig.color}"
-        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><circle cx=%2224%22 cy=%2224%22 r=%2220%22 fill=%22%23cccccc%22/></svg>'">
-      <div class="custom-marker-badge" style="background: ${activityConfig.color}; color: white;">
-        <i class="mdi ${activityConfig.icon}"></i>
+      <div class="custom-marker-profile-wrapper">
+        <div class="custom-marker-image-container" style="--border-color: ${zoneConfig.color};">
+          <img
+            src="${pictureUrl}"
+            class="custom-marker-image"
+            style="border: 3px solid ${zoneConfig.color}"
+            onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><circle cx=%2224%22 cy=%2224%22 r=%2220%22 fill=%22%23cccccc%22/></svg>'">
+        </div>
+        <div class="custom-marker-badge" style="background: ${activityConfig.color}; color: white;">
+          <i class="mdi ${activityConfig.icon}"></i>
+        </div>
       </div>
+      <div class="custom-marker-position-circle" style="background: white; border: 2px solid ${zoneConfig.color};"></div>
     </div>
   `;
 }
@@ -309,9 +359,9 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
     markers[entityId].setIcon(L.divIcon({
       className: 'custom-leaflet-marker',
       html: iconHtml,
-      iconSize: [48, 48],
-      iconAnchor: [24, 48],
-      popupAnchor: [0, -48]
+      iconSize: [48, 62],
+      iconAnchor: [24, 62],
+      popupAnchor: [0, -62]
     }));
   } else {
     // Create new marker
@@ -319,9 +369,9 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
     const icon = L.divIcon({
       className: 'custom-leaflet-marker',
       html: iconHtml,
-      iconSize: [48, 48],
-      iconAnchor: [24, 48],
-      popupAnchor: [0, -48]
+      iconSize: [48, 62],
+      iconAnchor: [24, 62],
+      popupAnchor: [0, -62]
     });
 
     const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
@@ -386,7 +436,7 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
 
         const div = this.div;
         div.style.left = (pos.x - 24) + 'px'; // Center horizontally (48px / 2)
-        div.style.top = (pos.y - 48) + 'px'; // Position above point
+        div.style.top = (pos.y - 62) + 'px'; // Position above point (62px total height)
       }
 
       onRemove() {
