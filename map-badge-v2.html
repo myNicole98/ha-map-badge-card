@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/MaterialDesign-Webfont/7.2.96/css/materialdesignicons.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style id="dynamic-styles">
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    #map { width: 100%; height: 100vh; }
+
+    .custom-marker-wrapper {
+      position: relative;
+      width: 48px;
+      height: 48px;
+    }
+
+    .custom-marker-image {
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .custom-marker-badge {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    #refresh-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,0.95);
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    #refresh-button:hover {
+      background: rgba(255,255,255,1);
+    }
+
+    /* Leaflet custom marker styling */
+    .custom-leaflet-marker {
+      background: transparent !important;
+      border: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button id="refresh-button" title="Reset map to initial view">
+    <i class="mdi mdi-fit-to-screen"></i> Recenter
+  </button>
+
+<script>
+// Parse URL parameters for configuration
+const urlParams = new URLSearchParams(window.location.search);
+const MAP_PROVIDER = urlParams.get('provider') || 'osm'; // 'osm' or 'google'
+const GOOGLE_API_KEY = urlParams.get('apikey') || 'YOUR_API_KEY_HERE';
+const DEFAULT_ZOOM = parseInt(urlParams.get('zoom')) || 13;
+const MAP_TYPE = urlParams.get('maptype') || 'hybrid';
+const MODE = urlParams.get('mode') || 'proxy';
+const DEBUG = urlParams.get('debug') === '1';
+const TILT_ZOOM_THRESHOLD = parseInt(urlParams.get('tiltzoom')) || 18; // Zoom level to enable tilt
+const MARKER_BORDER_RADIUS = decodeURIComponent(urlParams.get('marker_radius') || '50%');
+const BADGE_BORDER_RADIUS = decodeURIComponent(urlParams.get('badge_radius') || '50%');
+
+// Apply dynamic border-radius styles
+const styleSheet = document.getElementById('dynamic-styles');
+if (styleSheet && styleSheet.sheet) {
+  styleSheet.sheet.insertRule(`.custom-marker-image { border-radius: ${MARKER_BORDER_RADIUS}; }`, styleSheet.sheet.cssRules.length);
+  styleSheet.sheet.insertRule(`.custom-marker-badge { border-radius: ${BADGE_BORDER_RADIUS}; }`, styleSheet.sheet.cssRules.length);
+}
+
+// Parse entities configuration
+const entitiesParam = urlParams.get('entities') || '';
+const ENTITIES = entitiesParam.split(',').map(e => {
+  const parts = e.trim().split(':');
+  return {
+    person: parts[0],
+    activity: parts[1] || null
+  };
+}).filter(e => e.person);
+
+// Parse zones configuration (zones only have colors now, no icons)
+const zonesParam = urlParams.get('zones') || '';
+const ZONES = {};
+if (zonesParam) {
+  zonesParam.split(',').forEach(zone => {
+    const [state, color] = zone.split(':');
+    if (state && color) {
+      ZONES[state] = { color: decodeURIComponent(color) };
+    }
+  });
+}
+
+// Default zones if not configured
+if (Object.keys(ZONES).length === 0) {
+  ZONES.home = { color: '#cef595' };
+  ZONES.not_home = { color: '#757575' };
+}
+
+// Parse activities configuration
+const activitiesParam = urlParams.get('activities') || '';
+const ACTIVITIES = {};
+if (activitiesParam) {
+  activitiesParam.split(',').forEach(activity => {
+    const [state, icon, color] = activity.split(':');
+    if (state && icon && color) {
+      // Convert icon from 'mdi:icon-name' to 'mdi-icon-name' format
+      const iconClass = icon.replace(':', '-');
+      ACTIVITIES[state] = { icon: iconClass, color: decodeURIComponent(color) };
+    }
+  });
+}
+
+// Default activities if not configured (activities always have white icons on configurable backgrounds)
+// By default, use black background if no activities are configured
+if (Object.keys(ACTIVITIES).length === 0) {
+  ACTIVITIES.unknown = { icon: 'mdi-human-male', color: '#000000' };
+}
+
+let map;
+let markers = {};
+let entityData = {};
+let lastUpdate = null;
+let updateCount = 0;
+let initialViewSet = false;
+let isOSM = MAP_PROVIDER === 'osm';
+
+// OpenStreetMap initialization
+function initOSM() {
+  try {
+    map = L.map('map').setView([0, 0], DEFAULT_ZOOM);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    console.log('OpenStreetMap initialized');
+
+    // Signal that map is ready
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    }
+  } catch (error) {
+    console.error('Error initializing OpenStreetMap:', error);
+  }
+}
+
+// Google Maps initialization
+function initGoogleMaps() {
+  try {
+    // Determine map type ID
+    let mapTypeId;
+    switch(MAP_TYPE.toLowerCase()) {
+      case 'satellite':
+        mapTypeId = google.maps.MapTypeId.SATELLITE;
+        break;
+      case 'hybrid':
+        mapTypeId = google.maps.MapTypeId.HYBRID;
+        break;
+      case 'terrain':
+        mapTypeId = google.maps.MapTypeId.TERRAIN;
+        break;
+      case 'roadmap':
+      default:
+        mapTypeId = google.maps.MapTypeId.ROADMAP;
+        break;
+    }
+
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: 0, lng: 0 },
+      zoom: DEFAULT_ZOOM,
+      mapTypeId: mapTypeId,
+      mapTypeControl: false,
+      mapTypeControlOptions: {
+        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: google.maps.ControlPosition.TOP_RIGHT
+      },
+      zoomControl: false,
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_CENTER
+      },
+      streetViewControl: true,
+      fullscreenControl: false,
+      // Enable rotation controls
+      rotateControl: false,
+      rotateControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_CENTER
+      },
+      // Smooth animations
+      gestureHandling: 'greedy',
+      // Allow tilt
+      tilt: 0 // Start flat, will tilt when zoomed in
+    });
+
+    // Listen for zoom changes to enable/disable tilt
+    map.addListener('zoom_changed', () => {
+      const currentZoom = map.getZoom();
+      const currentTilt = map.getTilt();
+
+      // Enable 45-degree tilt when zoomed in beyond threshold
+      if (currentZoom >= TILT_ZOOM_THRESHOLD && currentTilt === 0) {
+        map.setTilt(45);
+        console.log(`Tilt enabled at zoom level ${currentZoom}`);
+      }
+      // Disable tilt when zooming out
+      else if (currentZoom < TILT_ZOOM_THRESHOLD && currentTilt === 45) {
+        map.setTilt(0);
+        console.log(`Tilt disabled at zoom level ${currentZoom}`);
+      }
+    });
+
+    console.log('Google Maps initialized with tilt support');
+
+  } catch (error) {
+    console.error('Error initializing map:', error);
+  }
+}
+
+// Unified init function
+function initMap() {
+  if (isOSM) {
+    initOSM();
+  } else {
+    initGoogleMaps();
+  }
+}
+
+function createMarkerHTML(personState, activityState, pictureUrl) {
+  const zoneConfig = ZONES[personState] || ZONES.not_home || { color: '#757575' };
+  const activityConfig = ACTIVITIES[activityState] || ACTIVITIES.unknown || { icon: 'mdi-human-male', color: '#000000' };
+
+  return `
+    <div class="custom-marker-wrapper">
+      <img
+        src="${pictureUrl}"
+        class="custom-marker-image"
+        style="border: 3px solid ${zoneConfig.color}"
+        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><circle cx=%2224%22 cy=%2224%22 r=%2220%22 fill=%22%23cccccc%22/></svg>'">
+      <div class="custom-marker-badge" style="background: ${activityConfig.color}; color: white;">
+        <i class="mdi ${activityConfig.icon}"></i>
+      </div>
+    </div>
+  `;
+}
+
+function updateMarker(entityId, data) {
+  const lat = data.attributes.latitude;
+  const lon = data.attributes.longitude;
+  const personState = data.state;
+  const activityState = data.activity || 'unknown';
+  const pictureUrl = data.attributes.entity_picture || '';
+
+  if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
+    console.warn(`Invalid GPS coordinates for ${entityId}:`, lat, lon);
+    return false;
+  }
+
+  try {
+    if (isOSM) {
+      return updateMarkerOSM(entityId, data, lat, lon, personState, activityState, pictureUrl);
+    } else {
+      return updateMarkerGoogle(entityId, data, lat, lon, personState, activityState, pictureUrl);
+    }
+  } catch (error) {
+    console.error(`Error updating marker for ${entityId}:`, error);
+    return false;
+  }
+}
+
+// OpenStreetMap marker update
+function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, pictureUrl) {
+  const friendlyName = data.attributes.friendly_name || entityId;
+  const activityLabel = activityState.replace(/_/g, ' ');
+
+  if (markers[entityId]) {
+    // Update existing marker
+    markers[entityId].setLatLng([lat, lon]);
+
+    // Update popup content
+    const popupContent = `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`;
+    markers[entityId].setPopupContent(popupContent);
+
+    // Update icon HTML
+    const iconHtml = createMarkerHTML(personState, activityState, pictureUrl);
+    markers[entityId].setIcon(L.divIcon({
+      className: 'custom-leaflet-marker',
+      html: iconHtml,
+      iconSize: [48, 48],
+      iconAnchor: [24, 48],
+      popupAnchor: [0, -48]
+    }));
+  } else {
+    // Create new marker
+    const iconHtml = createMarkerHTML(personState, activityState, pictureUrl);
+    const icon = L.divIcon({
+      className: 'custom-leaflet-marker',
+      html: iconHtml,
+      iconSize: [48, 48],
+      iconAnchor: [24, 48],
+      popupAnchor: [0, -48]
+    });
+
+    const marker = L.marker([lat, lon], { icon: icon }).addTo(map);
+
+    const popupContent = `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`;
+    marker.bindPopup(popupContent);
+
+    markers[entityId] = marker;
+  }
+
+  return true;
+}
+
+// Google Maps marker update
+function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState, pictureUrl) {
+  const position = { lat: lat, lng: lon };
+
+  if (markers[entityId]) {
+    // Update existing marker
+    markers[entityId].setPosition(position);
+
+    // Update the custom overlay content
+    const overlayDiv = markers[entityId].overlayDiv;
+    if (overlayDiv) {
+      overlayDiv.innerHTML = createMarkerHTML(personState, activityState, pictureUrl);
+    }
+  } else {
+    // Create custom HTML overlay
+    class CustomMarker extends google.maps.OverlayView {
+      constructor(position, html, title) {
+        super();
+        this.position = position;
+        this.html = html;
+        this.title = title;
+        this.div = null;
+      }
+
+      onAdd() {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.cursor = 'pointer';
+        div.innerHTML = this.html;
+        div.title = this.title;
+
+        // Add click event for info window
+        div.addEventListener('click', () => {
+          if (this.infoWindow) {
+            this.infoWindow.open(this.getMap());
+          }
+        });
+
+        this.div = div;
+        const panes = this.getPanes();
+        panes.overlayMouseTarget.appendChild(div);
+      }
+
+      draw() {
+        const overlayProjection = this.getProjection();
+        const pos = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(this.position.lat, this.position.lng)
+        );
+
+        const div = this.div;
+        div.style.left = (pos.x - 24) + 'px'; // Center horizontally (48px / 2)
+        div.style.top = (pos.y - 48) + 'px'; // Position above point
+      }
+
+      onRemove() {
+        if (this.div) {
+          this.div.parentNode.removeChild(this.div);
+          this.div = null;
+        }
+      }
+
+      setPosition(newPosition) {
+        this.position = newPosition;
+        this.draw();
+      }
+
+      updateContent(html) {
+        if (this.div) {
+          this.div.innerHTML = html;
+        }
+      }
+    }
+
+    const friendlyName = data.attributes.friendly_name || entityId;
+    const activityLabel = activityState.replace(/_/g, ' ');
+
+    const marker = new CustomMarker(
+      position,
+      createMarkerHTML(personState, activityState, pictureUrl),
+      friendlyName
+    );
+
+    marker.setMap(map);
+
+    // Create info window
+    const infoWindow = new google.maps.InfoWindow({
+      content: `<div style="padding: 8px;"><b>${friendlyName}</b><br>📍 ${personState}<br>🏃 ${activityLabel}</div>`,
+      position: position
+    });
+
+    marker.infoWindow = infoWindow;
+    marker.overlayDiv = marker.div;
+    markers[entityId] = marker;
+  }
+
+  return true;
+}
+
+function fitMapToMarkers() {
+  if (Object.keys(markers).length === 0) {
+    return;
+  }
+
+  try {
+    if (isOSM) {
+      // OpenStreetMap (Leaflet)
+      if (Object.keys(markers).length === 1) {
+        const marker = Object.values(markers)[0];
+        map.setView(marker.getLatLng(), DEFAULT_ZOOM);
+      } else {
+        const group = L.featureGroup(Object.values(markers));
+        map.fitBounds(group.getBounds(), { padding: [50, 50] });
+      }
+    } else {
+      // Google Maps
+      if (Object.keys(markers).length === 1) {
+        const marker = Object.values(markers)[0];
+        map.setCenter(marker.position);
+        map.setZoom(DEFAULT_ZOOM);
+      } else {
+        const bounds = new google.maps.LatLngBounds();
+        Object.values(markers).forEach(marker => {
+          bounds.extend(marker.position);
+        });
+        map.fitBounds(bounds, { padding: 50 });
+      }
+    }
+  } catch (error) {
+    console.error('Error fitting map to markers:', error);
+  }
+}
+
+function updateAllMarkers() {
+  let successCount = 0;
+  let errorCount = 0;
+  
+  for (const [entityId, data] of Object.entries(entityData)) {
+    if (updateMarker(entityId, data)) {
+      successCount++;
+    } else {
+      errorCount++;
+    }
+  }
+  
+  if (!initialViewSet && Object.keys(markers).length > 0) {
+    fitMapToMarkers();
+    initialViewSet = true;
+  }
+}
+
+// Load Google Maps API only if needed
+function loadGoogleMapsAPI() {
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&loading=async&callback=initMap`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => {
+    console.error('Failed to load Google Maps API');
+  };
+  document.head.appendChild(script);
+}
+
+// Make initMap global for callback
+window.initMap = initMap;
+
+// Load appropriate map provider
+if (isOSM) {
+  // OpenStreetMap - Leaflet is already loaded, just initialize
+  initMap();
+} else {
+  // Google Maps - need to load API first
+  loadGoogleMapsAPI();
+}
+
+// Set up refresh button
+document.getElementById('refresh-button').addEventListener('click', fitMapToMarkers);
+
+// Listen for entity data from parent
+window.addEventListener('message', (event) => {
+  if (!event.data || !event.data.type) {
+    return;
+  }
+
+  if (event.data.type === 'entity-update') {
+    const newData = event.data.data || {};
+    const hasData = Object.keys(newData).length > 0;
+
+    if (hasData) {
+      entityData = newData;
+      lastUpdate = event.data.timestamp;
+      updateCount++;
+
+      updateAllMarkers();
+
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'data-received' }, '*');
+      }
+    }
+  } else if (event.data.type === 'config-update') {
+    // Handle dynamic config updates (zones, activities, border radius)
+    if (event.data.zones) {
+      Object.keys(ZONES).forEach(key => delete ZONES[key]);
+      Object.assign(ZONES, event.data.zones);
+      console.log('Zones updated:', ZONES);
+    }
+
+    if (event.data.activities) {
+      Object.keys(ACTIVITIES).forEach(key => delete ACTIVITIES[key]);
+      // Convert icon format from 'mdi:icon-name' to 'mdi-icon-name'
+      const convertedActivities = {};
+      Object.entries(event.data.activities).forEach(([state, config]) => {
+        convertedActivities[state] = {
+          ...config,
+          icon: config.icon ? config.icon.replace(':', '-') : config.icon
+        };
+      });
+      Object.assign(ACTIVITIES, convertedActivities);
+      console.log('Activities updated:', ACTIVITIES);
+    }
+
+    if (event.data.marker_border_radius || event.data.badge_border_radius) {
+      // Update border radius styles
+      const styleSheet = document.getElementById('dynamic-styles');
+      if (styleSheet && styleSheet.sheet) {
+        // Remove old border-radius rules (they're the last two rules)
+        const rulesCount = styleSheet.sheet.cssRules.length;
+        if (rulesCount >= 2) {
+          styleSheet.sheet.deleteRule(rulesCount - 1);
+          styleSheet.sheet.deleteRule(rulesCount - 2);
+        }
+
+        // Add new border-radius rules
+        const markerRadius = event.data.marker_border_radius || '50%';
+        const badgeRadius = event.data.badge_border_radius || '50%';
+        styleSheet.sheet.insertRule(`.custom-marker-image { border-radius: ${markerRadius}; }`, styleSheet.sheet.cssRules.length);
+        styleSheet.sheet.insertRule(`.custom-marker-badge { border-radius: ${badgeRadius}; }`, styleSheet.sheet.cssRules.length);
+        console.log('Border radius updated:', markerRadius, badgeRadius);
+      }
+    }
+
+    // Re-render all markers with new config
+    updateAllMarkers();
+
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'config-received' }, '*');
+    }
+  }
+});
+
+// Send ready signals to parent
+function sendReadySignal() {
+  if (window.parent !== window) {
+    window.parent.postMessage({ type: 'iframe-ready' }, '*');
+  }
+}
+
+sendReadySignal();
+setTimeout(sendReadySignal, 500);
+setTimeout(sendReadySignal, 1500);
+setTimeout(sendReadySignal, 3000);
+
+// Request data periodically if not receiving updates
+let requestCount = 0;
+setInterval(() => {
+  const now = Date.now();
+  const timeSinceUpdate = lastUpdate ? (now - lastUpdate) / 1000 : Infinity;
+  
+  if (timeSinceUpdate > 20) {
+    requestCount++;
+    
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'request-data' }, '*');
+      window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    }
+  }
+}, 10000);
+</script>
+</body>
+</html>
