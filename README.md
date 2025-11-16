@@ -41,15 +41,29 @@ _Coming soon_
 
 ### Manual Installation
 
-1. Download `map-badge-card.js` and `map-badge-v2.html`
+1. Download all required files from the `src/` directory:
+   - `map-badge-card.js` (main entry point)
+   - `constants.js`
+   - `config-manager.js`
+   - `entity-data-fetcher.js`
+   - `iframe-messenger.js`
+   - `editor-ui.js`
+   - `editor-handlers.js`
+   - `map-badge-v2.html`
+
 2. Create a folder `/config/www/map-badge-card/`
-3. Copy both files into that folder
+
+3. Copy **all 8 files** into that folder
+
 4. Add the card resource:
    - Go to Settings → Dashboards → Resources
    - Click "Add Resource"
    - URL: `/local/map-badge-card/map-badge-card.js`
-   - Resource type: `JavaScript Module`
+   - Resource type: **`JavaScript Module`** (important!)
+
 5. Refresh your browser
+
+**Note:** The card uses ES6 modules, so all files must be in the same directory and the resource type must be set to "JavaScript Module".
 
 ## Configuration
 
@@ -122,7 +136,7 @@ activities:
 
 ### Supported Activities
 
-Based on [Google](https://developers.google.com/android/reference/com/google/android/gms/location/DetectedActivity) and iOS activity detection APIs. Icons are fixed, you can only change colors.
+Based on [Google](https://developers.google.com/android/reference/com/google/android/gms/location/DetectedActivity) and iOS activity detection APIs. Icon colors are customizable.
 
 - Still, On Foot, Walking, Running, Cycling
 - In Vehicle (covers car, automotive, etc.)
@@ -133,6 +147,6 @@ All default to black background with white icons.
 
 ## Requirements
 
-Your person entities need GPS coordinates (latitude/longitude) and profile pictures. Activity sensors come from the [Home Assistant Companion App](https://companion.home-assistant.io/) or similar integrations.
+Your person entities need GPS coordinates (latitude/longitude). Activity sensors come from the [Home Assistant Companion App](https://companion.home-assistant.io/) or similar integrations.
 
 For Google Maps, you'll need an API key from [Google Cloud Console](https://console.cloud.google.com/) with billing enabled. OpenStreetMap works out of the box.
