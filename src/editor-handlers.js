@@ -13,9 +13,37 @@ export class EditorHandlers {
     this._attachMapProviderListeners(element, config, onChange);
     this._attachBasicConfigListeners(element, config, onChange);
     this._attachBorderRadiusListeners(element, config, onChange);
+    this._attachMarkerSizeListener(element, config, onChange);
+    this._attachActivitySourceListener(element, config, onChange);
     this._attachEntityListeners(element, config, onChange, onRender);
     this._attachZoneListeners(element, config, onChange, onRender);
     this._attachActivityListeners(element, config, onChange);
+  }
+
+  /**
+   * Attaches marker size listener
+   * @param {HTMLElement} element - Root element
+   * @param {Object} config - Configuration object
+   * @param {Function} onChange - Callback when config changes
+   */
+  static _attachMarkerSizeListener(element, config, onChange) {
+    element.querySelector('#marker_size')?.addEventListener('selected', (e) => {
+      config.marker_size = e.target.value;
+      onChange();
+    });
+  }
+
+  /**
+   * Attaches activity source listener
+   * @param {HTMLElement} element - Root element
+   * @param {Object} config - Configuration object
+   * @param {Function} onChange - Callback when config changes
+   */
+  static _attachActivitySourceListener(element, config, onChange) {
+    element.querySelector('#activity_source')?.addEventListener('selected', (e) => {
+      config.activity_source = e.target.value;
+      onChange();
+    });
   }
 
   /**

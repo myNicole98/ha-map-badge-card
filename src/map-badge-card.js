@@ -35,7 +35,8 @@ class MapBadgeCard extends HTMLElement {
       'zones',
       'activities',
       'marker_border_radius',
-      'badge_border_radius'
+      'badge_border_radius',
+      'marker_size'
     ]);
 
     if (visualPropsChanged && this._iframe && this._messenger.isReady()) {
@@ -77,7 +78,8 @@ class MapBadgeCard extends HTMLElement {
   }
 
   async _fetchEntities() {
-    const data = await this._dataFetcher.fetchEntities();
+    const config = this._configManager.getConfig();
+    const data = await this._dataFetcher.fetchEntities(config);
 
     if (!data) return;
 
@@ -94,7 +96,8 @@ class MapBadgeCard extends HTMLElement {
       config.zones,
       config.activities,
       config.marker_border_radius,
-      config.badge_border_radius
+      config.badge_border_radius,
+      config.marker_size
     );
   }
 

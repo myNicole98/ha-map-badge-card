@@ -13,6 +13,9 @@ A custom card that shows person locations on a map with profile pictures and act
 - Profile pictures as map markers with colored borders based on zones
 - Activity badges (walking, driving, etc.) from your phone's sensors
 - Customizable colors and border styles
+- Adjustable Marker Sizes (Small, Medium, Large)
+- Speed Display in Popups
+- Speed-based Activity Prediction
 
 ### Zone-based Markers
 
@@ -95,6 +98,7 @@ google_api_key: YOUR_GOOGLE_API_KEY
 map_type: hybrid  # hybrid, satellite, roadmap, or terrain
 default_zoom: 15
 update_interval: 10
+marker_size: medium  # small, medium, large
 marker_border_radius: 50%  # 50% for circles, or use px (e.g., 8px)
 badge_border_radius: 50%
 debug: false
@@ -116,6 +120,7 @@ activities:
     color: '#2196f3'
   in_vehicle:
     color: '#9c27b0'
+activity_source: sensor  # sensor or speed_predicted
 ```
 
 ## Configuration Options
@@ -128,11 +133,13 @@ activities:
 | `map_type` | string | `hybrid` | Google Maps type: `hybrid`, `satellite`, `roadmap`, or `terrain` |
 | `default_zoom` | number | `13` | Initial map zoom level (1-21) |
 | `update_interval` | number | `10` | Update interval in seconds |
+| `marker_size` | string | `medium` | Marker size: `small`, `medium`, or `large` |
 | `marker_border_radius` | string | `50%` | Border radius for profile pictures |
 | `badge_border_radius` | string | `50%` | Border radius for activity badges |
 | `debug` | boolean | `false` | Enable debug mode for troubleshooting |
 | `zones` | object | See below | Custom zone configurations |
 | `activities` | object | See below | Custom activity color configurations |
+| `activity_source` | string | `sensor` | Activity source: `sensor` or `speed_predicted` |
 
 ### Supported Activities
 
@@ -150,3 +157,17 @@ All default to black background with white icons.
 Your person entities need GPS coordinates (latitude/longitude). Activity sensors come from the [Home Assistant Companion App](https://companion.home-assistant.io/) or similar integrations.
 
 For Google Maps, you'll need an API key from [Google Cloud Console](https://console.cloud.google.com/) with billing enabled. OpenStreetMap works out of the box.
+
+## Notes
+
+### Speed Prediction Feature
+The speed-based activity prediction feature requires GPS position history and works best with frequent updates. The card calculates speed based on position changes over time, so:
+- Speed display will appear after at least 2 position updates
+- Prediction accuracy improves with more frequent GPS updates (e.g., every 10-30 seconds)
+- Activity prediction uses the following thresholds:
+  - **Still**: < 1 km/h
+  - **Walking**: 1-7 km/h 
+  - **On Bicycle**: 7-25 km/h
+  - **In Vehicle**: > 25 km/h
+
+The speed calculation is performed locally in your browser and uses a Haversine formula for distance calculation between GPS coordinates.

@@ -20,6 +20,37 @@ export const DEFAULT_ACTIVITIES = {
 };
 
 /**
+ * Marker size presets
+ */
+export const MARKER_SIZES = {
+  small: {
+    marker: 36,
+    badge: 15,
+    popupOffset: -52
+  },
+  medium: {
+    marker: 48,
+    badge: 20,
+    popupOffset: -68
+  },
+  large: {
+    marker: 64,
+    badge: 24,
+    popupOffset: -88
+  }
+};
+
+/**
+ * Activity speed thresholds in km/h
+ */
+export const ACTIVITY_THRESHOLDS = {
+  still: 1,
+  walking: 7,
+  cycling: 25,
+  vehicle: 25
+};
+
+/**
  * Default zone configurations
  */
 export const DEFAULT_ZONES = {
@@ -39,6 +70,9 @@ export const DEFAULT_CONFIG = {
   update_interval: 10, // in seconds
   marker_border_radius: '50%',
   badge_border_radius: '50%',
+  marker_size: 'medium',
+  use_predicted_activity: false,
+  activity_source: 'sensor',
   debug: false,
   zones: DEFAULT_ZONES,
   activities: {}

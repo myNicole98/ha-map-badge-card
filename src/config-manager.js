@@ -29,6 +29,9 @@ export class ConfigManager {
       update_interval: config.update_interval || DEFAULT_CONFIG.update_interval,
       marker_border_radius: config.marker_border_radius || DEFAULT_CONFIG.marker_border_radius,
       badge_border_radius: config.badge_border_radius || DEFAULT_CONFIG.badge_border_radius,
+      marker_size: config.marker_size || DEFAULT_CONFIG.marker_size,
+      use_predicted_activity: config.use_predicted_activity || DEFAULT_CONFIG.use_predicted_activity,
+      activity_source: config.activity_source || DEFAULT_CONFIG.activity_source,
       zones: config.zones || DEFAULT_CONFIG.zones,
       activities: mergedActivities,
       debug: config.debug || DEFAULT_CONFIG.debug
@@ -119,6 +122,7 @@ export class ConfigManager {
     // Add border radius
     params.append('marker_radius', encodeURIComponent(this._config.marker_border_radius));
     params.append('badge_radius', encodeURIComponent(this._config.badge_border_radius));
+    params.append('marker_size', encodeURIComponent(this._config.marker_size));
 
     return params;
   }

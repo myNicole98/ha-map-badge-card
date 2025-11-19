@@ -348,6 +348,37 @@ export class EditorUI {
           </div>
           <div class="config-note">0% for square, 50% for circle</div>
         </div>
+
+        <div class="config-row">
+          <ha-select
+            id="marker_size"
+            label="Marker Size"
+            value="${config.marker_size || 'medium'}">
+            <mwc-list-item value="small">Small (36px)</mwc-list-item>
+            <mwc-list-item value="medium">Medium (48px)</mwc-list-item>
+            <mwc-list-item value="large">Large (64px)</mwc-list-item>
+          </ha-select>
+          <div class="config-note">Adjust the visual size of the entity markers on the map.</div>
+        </div>
+
+        <div class="config-row">
+          <ha-select
+            id="activity_source"
+            label="Activity Source"
+            value="${config.activity_source || 'sensor'}">
+            <mwc-list-item value="sensor">Activity Sensor</mwc-list-item>
+            <mwc-list-item value="speed_predicted">Speed-Based Prediction</mwc-list-item>
+          </ha-select>
+          <div class="config-note">
+            Choose how activity is determined.<br>
+            'Activity Sensor' uses a dedicated Home Assistant sensor (e.g., from a phone app).<br>
+            'Speed-Based Prediction' infers activity from movement speed:<br>
+            - Still: &lt; 1 km/h<br>
+            - Walking: 1-7 km/h<br>
+            - Cycling: 7-25 km/h<br>
+            - In Vehicle: &gt; 25 km/h
+          </div>
+        </div>
       </div>
     `;
   }

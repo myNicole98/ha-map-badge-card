@@ -160,7 +160,7 @@ export class IframeMessenger {
    * @param {string} badgeBorderRadius - Badge border radius
    * @returns {boolean} True if sent successfully
    */
-  sendConfigUpdate(zones, activities, markerBorderRadius, badgeBorderRadius) {
+  sendConfigUpdate(zones, activities, markerBorderRadius, badgeBorderRadius, markerSize) {
     if (!this._iframe || !this._iframe.contentWindow) {
       this._log('Cannot send config update: iframe not available');
       return false;
@@ -173,6 +173,7 @@ export class IframeMessenger {
         activities: activities,
         marker_border_radius: markerBorderRadius,
         badge_border_radius: badgeBorderRadius,
+        marker_size: markerSize,
         timestamp: Date.now()
       };
 
