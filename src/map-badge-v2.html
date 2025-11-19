@@ -606,7 +606,7 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
     marker.setPosition(position);
 
     // Update the custom overlay content
-    const overlayDiv = marker.overlayDiv;
+    const overlayDiv = marker.div;
     if (overlayDiv) {
       overlayDiv.innerHTML = createMarkerHTML(personState, activityState, pictureUrl);
     }
@@ -705,7 +705,6 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
     });
 
     marker.infoWindow = infoWindow;
-    marker.overlayDiv = marker.div;
     markers[entityId] = marker;
   }
 
