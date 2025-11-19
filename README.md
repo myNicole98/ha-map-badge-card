@@ -157,17 +157,3 @@ All default to black background with white icons.
 Your person entities need GPS coordinates (latitude/longitude). Activity sensors come from the [Home Assistant Companion App](https://companion.home-assistant.io/) or similar integrations.
 
 For Google Maps, you'll need an API key from [Google Cloud Console](https://console.cloud.google.com/) with billing enabled. OpenStreetMap works out of the box.
-
-## Notes
-
-### Speed Prediction Feature
-The speed-based activity prediction feature requires GPS position history and works best with frequent updates. The card calculates speed based on position changes over time, so:
-- Speed display will appear after at least 2 position updates
-- Prediction accuracy improves with more frequent GPS updates (e.g., every 10-30 seconds)
-- Activity prediction uses the following thresholds:
-  - **Still**: < 1 km/h
-  - **Walking**: 1-7 km/h 
-  - **On Bicycle**: 7-25 km/h
-  - **In Vehicle**: > 25 km/h
-
-The speed calculation is performed locally in your browser and uses a Haversine formula for distance calculation between GPS coordinates.
