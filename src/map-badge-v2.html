@@ -582,6 +582,7 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
         currentPopup.closePopup();
       }
       currentPopup = marker;
+      map.setView(marker.getLatLng(), 17, { animate: true });
     });
 
     markers[entityId] = marker;
@@ -634,13 +635,16 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
         div.title = this.title;
 
         // Add click event for info window
-        div.addEventListener('click', () => {
+        div.addEventListener('click', (e) => {
+          e.stopPropagation();
           // Close currently open popup
           if (currentPopup && currentPopup !== this.infoWindow) {
             currentPopup.close();
           }
 
           if (this.infoWindow) {
+            map.setCenter(this.position);
+            map.setZoom(17);
             this.infoWindow.open(this.getMap());
             currentPopup = this.infoWindow;
           }

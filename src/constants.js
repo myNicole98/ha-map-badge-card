@@ -46,8 +46,7 @@ export const MARKER_SIZES = {
 export const ACTIVITY_THRESHOLDS = {
   still: 1,
   walking: 7,
-  cycling: 25,
-  vehicle: 25
+  vehicle: 7
 };
 
 /**

@@ -11,6 +11,8 @@ export class EntityDataFetcher {
     this._entities = [];
     this._positionHistory = new Map(); // entityId → PositionEntry[]
     this._lastPredictedActivity = new Map(); // entityId → string (last known predicted activity)
+    this._candidateActivity = new Map(); // entityId → { activity: string, timestamp: number }
+    this._activityStabilityMs = 3000; // 3 second hysteresis
   }
 
   /**
@@ -138,12 +140,23 @@ export class EntityDataFetcher {
     // We use optional chaining and strict equality to ensure we only enter this block
     // if the user explicitly selected 'speed_predicted'
     if (config?.activity_source === 'speed_predicted') {
-      if (data.speed) {
-        // Use predicted activity and cache it for sticky behavior
-        const predictedActivity = data.predicted_activity || 'unknown';
-        this._lastPredictedActivity.set(entityId, predictedActivity);
-        this._log(`Activity for ${entityId}: predicted(${predictedActivity}) - speed available`);
-        return predictedActivity;
+      if (data.speed && data.speed.speed_kmh !== null && data.speed.speed_kmh !== undefined) {
+        // Use stable predicted activity with hysteresis
+        const activity = this._getStablePredictedActivity(entityId, data.speed.speed_kmh);
+        if (activity) {
+          this._log(`Activity for ${entityId}: predicted(${activity}) - speed available`);
+          return activity;
+        } else {
+          // Activity is stabilizing, use last predicted activity if available
+          const lastActivity = this._lastPredictedActivity.get(entityId);
+          if (lastActivity) {
+            this._log(`Activity for ${entityId}: stable(${lastActivity}) - stabilizing`);
+            return lastActivity;
+          }
+          // No last activity, use unknown
+          this._log(`Activity for ${entityId}: unknown - stabilizing, no last activity`);
+          return 'unknown';
+        }
       } else {
         // Speed is null, use sticky last predicted activity if available
         const lastActivity = this._lastPredictedActivity.get(entityId);
@@ -323,11 +336,41 @@ export class EntityDataFetcher {
       return 'still';
     } else if (speedKmh < ACTIVITY_THRESHOLDS.walking) {
       return 'walking';
-    } else if (speedKmh < ACTIVITY_THRESHOLDS.cycling) {
-      return 'on_bicycle';
     } else {
       return 'in_vehicle';
     }
+  }
+
+  /**
+   * Gets stable predicted activity with 3-second hysteresis
+   * @param {string} entityId - Entity identifier
+   * @param {number} speedKmh - Speed in km/h
+   * @returns {string|null} Activity if stable, null if stabilizing
+   */
+  _getStablePredictedActivity(entityId, speedKmh) {
+    const currentActivity = this.predictActivity(speedKmh);
+    const candidate = this._candidateActivity.get(entityId);
+    const now = Date.now();
+
+    if (!candidate || candidate.activity !== currentActivity) {
+      // New candidate activity, start tracking
+      this._candidateActivity.set(entityId, { activity: currentActivity, timestamp: now });
+      this._log(`Activity candidate for ${entityId}: ${currentActivity} (new)`);
+      return this._lastPredictedActivity.get(entityId) || null;
+    }
+
+    // Same candidate, check if we've passed stability period
+    const elapsed = now - candidate.timestamp;
+    if (elapsed > this._activityStabilityMs) {
+      // Activity is stable, update last predicted activity
+      this._lastPredictedActivity.set(entityId, currentActivity);
+      this._log(`Activity stable for ${entityId}: ${currentActivity} (elapsed: ${elapsed}ms)`);
+      return currentActivity;
+    }
+
+    // Still stabilizing, return last stable activity
+    this._log(`Activity stabilizing for ${entityId}: ${currentActivity} (elapsed: ${elapsed}ms)`);
+    return this._lastPredictedActivity.get(entityId) || null;
   }
 
   /**
