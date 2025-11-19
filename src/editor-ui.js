@@ -375,8 +375,7 @@ export class EditorUI {
             'Speed-Based Prediction' infers activity from movement speed:<br>
             - Still: &lt; 1 km/h<br>
             - Walking: 1-7 km/h<br>
-            - Cycling: 7-25 km/h<br>
-            - In Vehicle: &gt; 25 km/h
+            - In Vehicle: &gt; 7 km/h
           </div>
         </div>
       </div>
