@@ -115,7 +115,7 @@ export class ConfigManager {
 
     // Add activities
     const activitiesParam = Object.entries(this._config.activities)
-      .map(([state, config]) => `${state}:${config.icon}:${encodeURIComponent(config.color)}`)
+      .map(([state, config]) => `${state}:${config.icon}:${encodeURIComponent(config.color)}:${encodeURIComponent(config.name)}`)
       .join(',');
     params.append('activities', activitiesParam);
 

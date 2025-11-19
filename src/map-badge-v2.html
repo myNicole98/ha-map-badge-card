@@ -309,11 +309,13 @@ const activitiesParam = urlParams.get('activities') || '';
 const ACTIVITIES = {};
 if (activitiesParam) {
   activitiesParam.split(',').forEach(activity => {
-    const [state, icon, color] = activity.split(':');
+    const [state, icon, color, name] = activity.split(':');
     if (state && icon && color) {
       // Convert icon from 'mdi:icon-name' to 'mdi-icon-name' format
       const iconClass = icon.replace(':', '-');
-      ACTIVITIES[state] = { icon: iconClass, color: decodeURIComponent(color) };
+      // If name is missing, default to state (capitalized/formatted)
+      const activityName = name ? decodeURIComponent(name) : state.charAt(0).toUpperCase() + state.slice(1).replace(/_/g, ' ');
+      ACTIVITIES[state] = { icon: iconClass, color: decodeURIComponent(color), name: activityName };
     }
   });
 }

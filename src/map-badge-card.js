@@ -25,6 +25,9 @@ class MapBadgeCard extends HTMLElement {
     const oldConfig = this._configManager.getConfig();
     const newConfig = this._configManager.setConfig(config);
 
+    // Check if activity_source changed
+    const activitySourceChanged = this._configManager.hasChanged(oldConfig, ['activity_source']);
+
     // Configure modules
     this._dataFetcher.setDebugMode(newConfig.debug);
     this._dataFetcher.setEntities(newConfig.entities);
@@ -43,6 +46,11 @@ class MapBadgeCard extends HTMLElement {
       this._sendConfigUpdate();
     } else {
       this._render();
+    }
+
+    // If activity_source changed, trigger data fetch immediately
+    if (activitySourceChanged && this._updateInterval) {
+      this._fetchEntities();
     }
   }
 
