@@ -161,7 +161,7 @@ class MapBadgeCard extends HTMLElement {
         // Backup attempt after longer delay
         setTimeout(() => {
           if (this._dataFetcher.hasData()) {
-            this._messenger.sendData(this._dataFetcher.prepareEntityData());
+      this._messenger.sendData(this._dataFetcher.prepareEntityData(this._configManager.getConfig()));
           }
         }, 2000);
       };
