@@ -129,7 +129,14 @@ export class EntityDataFetcher {
    * @returns {string} Selected activity state
    */
   _getActivityToUse(data, entityId, config) {
+    // Safety check for config
+    if (!config) {
+      this._log(`[Warning] No config provided to _getActivityToUse for ${entityId}. Defaulting to sensor.`);
+    }
+
     // Check if speed-based prediction is enabled
+    // We use optional chaining and strict equality to ensure we only enter this block
+    // if the user explicitly selected 'speed_predicted'
     if (config?.activity_source === 'speed_predicted') {
       if (data.speed) {
         // Use predicted activity and cache it for sticky behavior
@@ -145,6 +152,8 @@ export class EntityDataFetcher {
           return lastActivity;
         }
         // Fallback to unknown if no previous predicted activity
+        // IMPORTANT: We return 'unknown' here instead of falling back to sensor
+        // because the user explicitly requested speed-based prediction.
         this._log(`Activity for ${entityId}: unknown - speed null, no sticky value`);
         return 'unknown';
       }
@@ -162,6 +171,10 @@ export class EntityDataFetcher {
    * @returns {Object} Formatted entity data
    */
   prepareEntityData(config) {
+    if (!config) {
+      console.warn('[EntityDataFetcher] prepareEntityData called without config. Activity prediction may be incorrect.');
+    }
+
     const entityData = {};
 
     for (const [entityId, data] of Object.entries(this._entityCache)) {

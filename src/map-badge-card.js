@@ -187,7 +187,7 @@ class MapBadgeCard extends HTMLElement {
       this._messenger.sendData(this._pendingData);
       this._pendingData = null;
     } else if (this._dataFetcher.hasData()) {
-      this._messenger.sendData(this._dataFetcher.prepareEntityData());
+      this._messenger.sendData(this._dataFetcher.prepareEntityData(this._configManager.getConfig()));
     } else {
       this._fetchEntities();
     }
@@ -208,7 +208,7 @@ class MapBadgeCard extends HTMLElement {
 
         // If data is less than 30 seconds old, retry
         if (now - lastUpdate < 30000) {
-          this._messenger.sendData(this._dataFetcher.prepareEntityData());
+          this._messenger.sendData(this._dataFetcher.prepareEntityData(this._configManager.getConfig()));
           this._messenger.incrementRetryCount();
         }
       }
