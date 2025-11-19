@@ -10,6 +10,7 @@ export class EntityDataFetcher {
     this._hass = null;
     this._entities = [];
     this._positionHistory = new Map(); // entityId → PositionEntry[]
+    this._lastPredictedActivity = new Map(); // entityId → string (last known predicted activity)
   }
 
   /**
@@ -123,17 +124,36 @@ export class EntityDataFetcher {
   /**
    * Determines which activity to use based on configuration
    * @param {Object} data - Entity cache data
+   * @param {string} entityId - Entity identifier
    * @param {Object} config - Card configuration
    * @returns {string} Selected activity state
    */
-  _getActivityToUse(data, config) {
-    // Check if speed-based prediction is enabled and speed data is available
-    if (config?.activity_source === 'speed_predicted' && data.speed) {
-      return data.predicted_activity || 'unknown';
+  _getActivityToUse(data, entityId, config) {
+    // Check if speed-based prediction is enabled
+    if (config?.activity_source === 'speed_predicted') {
+      if (data.speed) {
+        // Use predicted activity and cache it for sticky behavior
+        const predictedActivity = data.predicted_activity || 'unknown';
+        this._lastPredictedActivity.set(entityId, predictedActivity);
+        this._log(`Activity for ${entityId}: predicted(${predictedActivity}) - speed available`);
+        return predictedActivity;
+      } else {
+        // Speed is null, use sticky last predicted activity if available
+        const lastActivity = this._lastPredictedActivity.get(entityId);
+        if (lastActivity) {
+          this._log(`Activity for ${entityId}: sticky(${lastActivity}) - speed null`);
+          return lastActivity;
+        }
+        // Fallback to unknown if no previous predicted activity
+        this._log(`Activity for ${entityId}: unknown - speed null, no sticky value`);
+        return 'unknown';
+      }
     }
     
     // Default to sensor activity if available
-    return data.activity ? data.activity.state : 'unknown';
+    const sensorActivity = data.activity ? data.activity.state : 'unknown';
+    this._log(`Activity for ${entityId}: sensor(${sensorActivity})`);
+    return sensorActivity;
   }
 
   /**
@@ -159,7 +179,7 @@ export class EntityDataFetcher {
           friendly_name: data.person.attributes.friendly_name,
           entity_picture: pictureUrl
         },
-        activity: this._getActivityToUse(data, config),
+        activity: this._getActivityToUse(data, entityId, config),
         speed: data.speed || null,
         predicted_activity: data.predicted_activity || null
       };
