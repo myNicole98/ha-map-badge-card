@@ -13,67 +13,59 @@
 
     .custom-marker-wrapper {
       position: relative;
-      width: 48px;
-      height: 62px; /* Increased to accommodate pointer shape */
+      width: var(--marker-size, 48px);
       display: flex;
       flex-direction: column;
       align-items: center;
-    }
-
-    .custom-marker-position-circle {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      z-index: 1;
+      justify-content: flex-start;
+      overflow: visible;
     }
 
     .custom-marker-profile-wrapper {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 48px;
-      height: 54px;
+      position: relative;
+      width: var(--marker-size, 48px);
+      height: var(--marker-size, 48px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
       z-index: 2;
     }
 
     .custom-marker-image-container {
-      width: 48px;
-      height: 54px;
+      width: var(--marker-size, 48px);
+      height: var(--marker-size, 48px);
       position: relative;
+      overflow: visible;
     }
 
     .custom-marker-image-container::after {
       content: '';
       position: absolute;
-      bottom: 0;
+      bottom: -6px;
       left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 6px solid transparent;
-      border-right: 6px solid transparent;
-      border-top: 8px solid var(--border-color, #757575);
-      z-index: 1;
+      transform: translateX(-50%) rotate(45deg);
+      width: 12px;
+      height: 12px;
+      background: var(--border-color, #757575);
+      z-index: -1;
+      pointer-events: none;
     }
 
     .custom-marker-image {
-      width: 48px;
-      height: 48px;
+      width: var(--marker-size, 48px);
+      height: var(--marker-size, 48px);
       object-fit: cover;
       display: block;
+      border-radius: var(--marker-radius, 50%);
     }
 
     .custom-marker-badge {
       position: absolute;
-      right: -2px;
-      bottom: -2px;
-      width: 20px;
-      height: 20px;
+      right: -4px;
+      bottom: -4px;
+      width: var(--badge-size, 20px);
+      height: var(--badge-size, 20px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -81,6 +73,17 @@
       color: white;
       box-shadow: 0 1px 3px rgba(0,0,0,0.3);
       z-index: 3;
+    }
+
+    .custom-marker-position-circle {
+      position: relative;
+      margin-top: 10px;
+      width: var(--position-circle-size, 16px);
+      height: var(--position-circle-size, 16px);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 1;
+      align-self: center;
     }
 
     #refresh-button {
@@ -247,33 +250,40 @@ const MARKER_SIZES = {
 };
 
 // Get selected marker size with fallback to medium
-let selectedMarkerSize = MARKER_SIZES[MARKER_SIZE_PARAM] || MARKER_SIZES.medium;
+let selectedMarkerSize = { ...(MARKER_SIZES[MARKER_SIZE_PARAM] || MARKER_SIZES.medium) };
 
 // Apply CSS custom properties for dynamic sizing
-document.documentElement.style.setProperty('--marker-size', `${selectedMarkerSize.marker}px`);
-document.documentElement.style.setProperty('--badge-size', `${selectedMarkerSize.badge}px`);
-document.documentElement.style.setProperty('--popup-offset', `${selectedMarkerSize.popupOffset}px`);
-document.documentElement.style.setProperty('--marker-height', `${selectedMarkerSize.marker + 14}px`); // +14 for pointer
+applyMarkerSizeVariables(selectedMarkerSize);
 
-// Apply CSS variables for border radius and sizing
-const styleSheet = document.getElementById('dynamic-styles');
-
-// Set CSS variables on document root
+// Apply CSS variables for border radius
 document.documentElement.style.setProperty('--marker-radius', MARKER_BORDER_RADIUS);
 document.documentElement.style.setProperty('--badge-radius', BADGE_BORDER_RADIUS);
-document.documentElement.style.setProperty('--marker-size', `${selectedMarkerSize.marker}px`);
-document.documentElement.style.setProperty('--badge-size', `${selectedMarkerSize.badge}px`);
-document.documentElement.style.setProperty('--popup-offset', `${selectedMarkerSize.popupOffset}px`);
-document.documentElement.style.setProperty('--marker-height', `${selectedMarkerSize.marker + 14}px`);
+
+const POSITION_CIRCLE_SIZE = 16;
+const MARKER_LAYOUT_FALLBACK_OFFSET = 24;
+let markerDimensions = {
+  size: selectedMarkerSize.marker,
+  totalHeight: selectedMarkerSize.marker + MARKER_LAYOUT_FALLBACK_OFFSET
+};
+
+const styleSheet = document.getElementById('dynamic-styles');
 
 // Add static CSS rules that use CSS variables (only if stylesheet is available)
 if (styleSheet && styleSheet.sheet) {
-  // Add static sizing and radius rules that use CSS variables
-  styleSheet.sheet.insertRule(`.custom-marker-wrapper { width: var(--marker-size); height: calc(var(--marker-size) + 14px); }`, styleSheet.sheet.cssRules.length);
-  styleSheet.sheet.insertRule(`.custom-marker-profile-wrapper { width: var(--marker-size); height: var(--marker-height); }`, styleSheet.sheet.cssRules.length);
-  styleSheet.sheet.insertRule(`.custom-marker-image-container { width: var(--marker-size); height: var(--marker-height); }`, styleSheet.sheet.cssRules.length);
-  styleSheet.sheet.insertRule(`.custom-marker-image { width: var(--marker-size); height: var(--marker-size); border-radius: var(--marker-radius); }`, styleSheet.sheet.cssRules.length);
-  styleSheet.sheet.insertRule(`.custom-marker-badge { width: var(--badge-size); height: var(--badge-size); border-radius: var(--badge-radius); font-size: calc(var(--badge-size) * 0.6); }`, styleSheet.sheet.cssRules.length);
+  const rules = [
+    `.custom-marker-wrapper { width: var(--marker-size); }`,
+    `.custom-marker-profile-wrapper { width: var(--marker-size); height: var(--marker-size); }`,
+    `.custom-marker-image-container { width: var(--marker-size); height: var(--marker-size); }`,
+    `.custom-marker-image { width: var(--marker-size); height: var(--marker-size); border-radius: var(--marker-radius); }`,
+    `.custom-marker-badge { width: var(--badge-size); height: var(--badge-size); border-radius: var(--badge-radius); font-size: calc(var(--badge-size) * 0.6); }`
+  ];
+  rules.forEach(rule => styleSheet.sheet.insertRule(rule, styleSheet.sheet.cssRules.length));
+}
+
+function applyMarkerSizeVariables(sizeConfig) {
+  document.documentElement.style.setProperty('--marker-size', `${sizeConfig.marker}px`);
+  document.documentElement.style.setProperty('--badge-size', `${sizeConfig.badge}px`);
+  document.documentElement.style.setProperty('--popup-offset', `${sizeConfig.popupOffset}px`);
 }
 
 // Parse entities configuration
@@ -456,10 +466,40 @@ function createMarkerHTML(personState, activityState, pictureUrl) {
       </div>
       <div class="custom-marker-position-circle" style="background: #76D4C3; border: 2px solid ${zoneConfig.color};"></div>
     </div>
-  `;
+   `;
+ }
+ 
+// Measure the rendered marker stack so anchors match pointer and circle placement
+function recalculateMarkerDimensions() {
+  markerDimensions.size = selectedMarkerSize.marker;
+  const measuredHeight = measureMarkerHeight();
+  markerDimensions.totalHeight = measuredHeight || (selectedMarkerSize.marker + MARKER_LAYOUT_FALLBACK_OFFSET);
 }
 
-function createPopupHTML(friendlyName, personState, pictureUrl, zoneColor, speedData, activityState) {
+function measureMarkerHeight() {
+  if (!document.body) {
+    return null;
+  }
+
+  const tempContainer = document.createElement('div');
+  tempContainer.style.position = 'absolute';
+  tempContainer.style.visibility = 'hidden';
+  tempContainer.style.pointerEvents = 'none';
+  tempContainer.innerHTML = createMarkerHTML('not_home', 'unknown', '');
+
+  document.body.appendChild(tempContainer);
+  const markerElement = tempContainer.querySelector('.custom-marker-wrapper');
+  const measuredHeight = markerElement ? Math.ceil(markerElement.getBoundingClientRect().height) : null;
+  tempContainer.remove();
+
+  return measuredHeight;
+}
+
+recalculateMarkerDimensions();
+
+ 
+ function createPopupHTML(friendlyName, personState, pictureUrl, zoneColor, speedData, activityState) {
+
   const stateLabel = personState.charAt(0).toUpperCase() + personState.slice(1).replace(/_/g, ' ');
   
   // Get activity display info from ACTIVITIES config
@@ -533,10 +573,11 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
   const speedData = data.speed || null;
   
   // Get dynamic marker dimensions
-  const markerSize = selectedMarkerSize.marker;
-  const markerHeight = markerSize + 14;
-  const markerAnchor = Math.floor(markerSize / 2);
+  const markerSize = markerDimensions.size;
+  const markerTotalHeight = markerDimensions.totalHeight;
   const popupOffset = selectedMarkerSize.popupOffset;
+  const markerAnchorX = Math.floor(markerSize / 2);
+  const markerAnchorY = markerTotalHeight - Math.floor(POSITION_CIRCLE_SIZE / 2);
 
   let marker = markers[entityId];
   const wasPopupOpen = marker && marker.isPopupOpen();
@@ -554,8 +595,8 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
     marker.setIcon(L.divIcon({
       className: 'custom-leaflet-marker',
       html: iconHtml,
-      iconSize: [markerSize, markerHeight],
-      iconAnchor: [markerAnchor, markerHeight],
+      iconSize: [markerSize, markerTotalHeight],
+      iconAnchor: [markerAnchorX, markerAnchorY],
       popupAnchor: [0, popupOffset]
     }));
     
@@ -566,8 +607,8 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
     const icon = L.divIcon({
       className: 'custom-leaflet-marker',
       html: iconHtml,
-      iconSize: [markerSize, markerHeight],
-      iconAnchor: [markerAnchor, markerHeight],
+      iconSize: [markerSize, markerTotalHeight],
+      iconAnchor: [markerAnchorX, markerAnchorY],
       popupAnchor: [0, popupOffset]
     });
 
@@ -582,7 +623,7 @@ function updateMarkerOSM(entityId, data, lat, lon, personState, activityState, p
         currentPopup.closePopup();
       }
       currentPopup = marker;
-      map.setView(marker.getLatLng(), 17, { animate: true });
+      map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17), { animate: true });
     });
 
     markers[entityId] = marker;
@@ -615,6 +656,9 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
     if (marker.infoWindow) {
       marker.infoWindow.setContent(createPopupHTML(friendlyName, personState, pictureUrl, zoneConfig.color, speedData, activityState));
       marker.infoWindow.setPosition(position);
+      marker.infoWindow.setOptions({
+        pixelOffset: new google.maps.Size(0, selectedMarkerSize.popupOffset)
+      });
     }
   } else {
     // Create custom HTML overlay
@@ -644,7 +688,7 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
 
           if (this.infoWindow) {
             map.setCenter(this.position);
-            map.setZoom(17);
+            map.setZoom(Math.max(map.getZoom(), 17));
             this.infoWindow.open(this.getMap());
             currentPopup = this.infoWindow;
           }
@@ -662,12 +706,13 @@ function updateMarkerGoogle(entityId, data, lat, lon, personState, activityState
         );
 
         const div = this.div;
-        const markerSize = selectedMarkerSize.marker;
-        const markerHeight = markerSize + 14;
+        const markerSize = markerDimensions.size;
+        const markerTotalHeight = markerDimensions.totalHeight;
         const markerAnchor = Math.floor(markerSize / 2);
+        const verticalAnchor = markerTotalHeight - Math.floor(POSITION_CIRCLE_SIZE / 2);
         
         div.style.left = (pos.x - markerAnchor) + 'px'; // Center horizontally
-        div.style.top = (pos.y - markerHeight) + 'px'; // Position above point
+        div.style.top = (pos.y - verticalAnchor) + 'px'; // Position above point
       }
 
       onRemove() {
@@ -849,16 +894,9 @@ window.addEventListener('message', (event) => {
 
     if (event.data.marker_size && MARKER_SIZES[event.data.marker_size]) {
       // Update marker size dynamically
-      const newSize = MARKER_SIZES[event.data.marker_size];
-      selectedMarkerSize.marker = newSize.marker;
-      selectedMarkerSize.badge = newSize.badge;
-      selectedMarkerSize.popupOffset = newSize.popupOffset;
-      
-      // Update CSS custom properties
-      document.documentElement.style.setProperty('--marker-size', `${newSize.marker}px`);
-      document.documentElement.style.setProperty('--badge-size', `${newSize.badge}px`);
-      document.documentElement.style.setProperty('--popup-offset', `${newSize.popupOffset}px`);
-      document.documentElement.style.setProperty('--marker-height', `${newSize.marker + 14}px`);
+      selectedMarkerSize = { ...MARKER_SIZES[event.data.marker_size] };
+      applyMarkerSizeVariables(selectedMarkerSize);
+      recalculateMarkerDimensions();
       
       console.log('Marker size updated to:', event.data.marker_size);
     }
