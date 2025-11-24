@@ -11,11 +11,21 @@ export class ConfigManager {
   /**
    * Validates and sets the configuration
    * @param {Object} config - User configuration
-   * @throws {Error} If entities are not defined
+   * @throws {Error} If entities are not defined or invalid configuration values
    */
   setConfig(config) {
     if (!config.entities || !Array.isArray(config.entities)) {
       throw new Error('You need to define entities');
+    }
+
+    // Validate speed_source configuration
+    if (config.speed_source && !['calculated', 'sensor'].includes(config.speed_source)) {
+      throw new Error(`Invalid speed_source "${config.speed_source}". Must be either 'calculated' or 'sensor'.`);
+    }
+
+    // Validate activity_source configuration
+    if (config.activity_source && !['sensor', 'speed_predicted'].includes(config.activity_source)) {
+      throw new Error(`Invalid activity_source "${config.activity_source}". Must be either 'sensor' or 'speed_predicted'.`);
     }
 
     const mergedActivities = this._mergeActivities(config.activities);
@@ -32,6 +42,7 @@ export class ConfigManager {
       marker_size: config.marker_size || DEFAULT_CONFIG.marker_size,
       use_predicted_activity: config.use_predicted_activity || DEFAULT_CONFIG.use_predicted_activity,
       activity_source: config.activity_source || DEFAULT_CONFIG.activity_source,
+      speed_source: config.speed_source || DEFAULT_CONFIG.speed_source,
       zones: config.zones || DEFAULT_CONFIG.zones,
       activities: mergedActivities,
       debug: config.debug || DEFAULT_CONFIG.debug
@@ -98,12 +109,21 @@ export class ConfigManager {
       maptype: this._config.map_type,
       zoom: this._config.default_zoom,
       mode: 'proxy',
+      activity_source: this._config.activity_source,
+      speed_source: this._config.speed_source,
       debug: this._config.debug ? '1' : '0'
     });
 
     // Add entities
     const entitiesParam = this._config.entities
-      .map(e => `${e.person}${e.activity ? ':' + e.activity : ''}`)
+      .map(e => {
+        let entityStr = e.person;
+        const params = [];
+        if (e.activity) params.push(`activity=${e.activity}`);
+        if (e.speed) params.push(`speed=${e.speed}`);
+        if (params.length > 0) entityStr += ':' + params.join(',');
+        return entityStr;
+      })
       .join(',');
     params.append('entities', entitiesParam);
 

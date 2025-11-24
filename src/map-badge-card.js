@@ -25,8 +25,9 @@ class MapBadgeCard extends HTMLElement {
     const oldConfig = this._configManager.getConfig();
     const newConfig = this._configManager.setConfig(config);
 
-    // Check if activity_source changed
+    // Check if activity_source or speed_source changed
     const activitySourceChanged = this._configManager.hasChanged(oldConfig, ['activity_source']);
+    const speedSourceChanged = this._configManager.hasChanged(oldConfig, ['speed_source']);
 
     // Configure modules
     this._dataFetcher.setDebugMode(newConfig.debug);
@@ -48,8 +49,8 @@ class MapBadgeCard extends HTMLElement {
       this._render();
     }
 
-    // If activity_source changed, trigger data fetch immediately
-    if (activitySourceChanged && this._updateInterval) {
+    // If activity_source or speed_source changed, trigger data fetch immediately
+    if ((activitySourceChanged || speedSourceChanged) && this._updateInterval) {
       this._fetchEntities();
     }
   }

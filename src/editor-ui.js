@@ -378,6 +378,21 @@ export class EditorUI {
             - In Vehicle: &gt; 7 km/h
           </div>
         </div>
+
+        <div class="config-row">
+          <ha-select
+            id="speed_source"
+            label="Speed Source"
+            value="${config.speed_source || 'calculated'}">
+            <mwc-list-item value="calculated">Calculated from GPS</mwc-list-item>
+            <mwc-list-item value="sensor">Speed Sensor</mwc-list-item>
+          </ha-select>
+          <div class="config-note">
+            Choose how speed is determined.<br>
+            'Calculated from GPS' computes speed from location updates.<br>
+            'Speed Sensor' uses a dedicated Home Assistant speed sensor.
+          </div>
+        </div>
       </div>
     `;
   }
@@ -472,6 +487,18 @@ export class EditorUI {
               placeholder="sensor.phone_activity"
               list="sensor-entities-list">
           </div>
+          <div class="input-wrapper">
+            <label>Speed Sensor</label>
+            <input
+              type="text"
+              id="entity-speed-${idx}"
+              class="entity-input"
+              value="${entity.speed || ''}"
+              data-entity-idx="${idx}"
+              data-entity-field="speed"
+              placeholder="sensor.phone_speed"
+              list="speed-sensor-list">
+          </div>
           <ha-icon-button
             data-entity-delete="${idx}">
             <ha-icon icon="mdi:delete"></ha-icon>
@@ -564,15 +591,42 @@ export class EditorUI {
    */
   static _generateDatalistsHTML(hass) {
     if (!hass || !hass.states) {
-      return '<datalist id="person-entities-list"></datalist><datalist id="sensor-entities-list"></datalist>';
+      return '<datalist id="person-entities-list"></datalist><datalist id="sensor-entities-list"></datalist><datalist id="speed-sensor-list"></datalist>';
     }
 
     const personEntities = Object.keys(hass.states)
       .filter(e => e.startsWith('person.'))
       .sort();
 
+    // Filter for general sensors (activity sensors, etc.)
     const sensorEntities = Object.keys(hass.states)
       .filter(e => e.startsWith('sensor.'))
+      .sort();
+
+    // Filter specifically for speed sensors based on common naming patterns and unit of measurement
+    const speedSensorEntities = Object.keys(hass.states)
+      .filter(e => {
+        if (!e.startsWith('sensor.')) return false;
+        
+        const state = hass.states[e];
+        if (!state || !state.attributes) return false;
+        
+        const entity_id = e.toLowerCase();
+        const friendlyName = (state.attributes.friendly_name || '').toLowerCase();
+        const unitOfMeasurement = (state.attributes.unit_of_measurement || '').toLowerCase();
+        
+        // Check for speed-related keywords in entity ID or friendly name
+        const speedKeywords = ['speed', 'velocity', 'gps_speed', 'current_speed', 'travel_speed'];
+        const hasSpeedKeyword = speedKeywords.some(keyword => 
+          entity_id.includes(keyword) || friendlyName.includes(keyword)
+        );
+        
+        // Check for speed-related units
+        const speedUnits = ['km/h', 'kmh', 'mph', 'm/s', 'mps', 'knot'];
+        const hasSpeedUnit = speedUnits.some(unit => unitOfMeasurement.includes(unit));
+        
+        return hasSpeedKeyword || hasSpeedUnit;
+      })
       .sort();
 
     const personDatalist = `
@@ -593,6 +647,18 @@ export class EditorUI {
       </datalist>
     `;
 
-    return personDatalist + sensorDatalist;
+    const speedSensorDatalist = `
+      <datalist id="speed-sensor-list">
+        ${speedSensorEntities.map(e => {
+          const state = hass.states[e];
+          const friendlyName = state?.attributes?.friendly_name || e;
+          const unit = state?.attributes?.unit_of_measurement || '';
+          const displayValue = unit ? `${friendlyName} (${unit})` : friendlyName;
+          return `<option value="${e}">${displayValue}</option>`;
+        }).join('')}
+      </datalist>
+    `;
+
+    return personDatalist + sensorDatalist + speedSensorDatalist;
   }
 }

@@ -86,6 +86,12 @@ export class EntityDataFetcher {
           activityState = this._hass.states[entityConfig.activity];
         }
 
+        // Fetch speed sensor entity if specified
+        let speedState = null;
+        if (entityConfig.speed) {
+          speedState = this._hass.states[entityConfig.speed];
+        }
+
         // Calculate speed and update position history
         const currentPosition = {
           latitude: personState.attributes.latitude,
@@ -93,15 +99,16 @@ export class EntityDataFetcher {
           timestamp: Date.now()
         };
 
-        const speedData = this.calculateSpeed(entityConfig.person, currentPosition);
+        const calculatedSpeedData = this.calculateSpeed(entityConfig.person, currentPosition);
         this._updatePositionHistory(entityConfig.person, currentPosition);
 
         // Store in cache
         this._entityCache[entityConfig.person] = {
           person: personState,
           activity: activityState,
-          speed: speedData,
-          predicted_activity: speedData ? this.predictActivity(speedData.speed_kmh) : null,
+          speed: calculatedSpeedData,
+          speed_sensor: speedState,
+          predicted_activity: calculatedSpeedData ? this.predictActivity(calculatedSpeedData.speed_kmh) : null,
           timestamp: Date.now()
         };
 
@@ -109,7 +116,7 @@ export class EntityDataFetcher {
 
         this._log(`Cached entity ${entityConfig.person}:`, personState.state,
           'Location:', personState.attributes.latitude, personState.attributes.longitude,
-          'Speed:', speedData ? `${speedData.speed_kmh.toFixed(1)} km/h` : 'N/A');
+          'Speed:', calculatedSpeedData ? `${calculatedSpeedData.speed_kmh.toFixed(1)} km/h` : 'N/A');
       } catch (error) {
         console.error(`[EntityDataFetcher] Error fetching ${entityConfig.person}:`, error);
       }
@@ -121,6 +128,50 @@ export class EntityDataFetcher {
     }
 
     return this.prepareEntityData(config);
+  }
+
+  /**
+   * Determines which speed to use based on configuration
+   * @param {Object} data - Entity cache data
+   * @param {Object} config - Card configuration
+   * @returns {Object|null} Selected speed data or null
+   */
+  _getSpeedToUse(data, config) {
+    // Safety check for config
+    if (!config) {
+      this._log(`[Warning] No config provided to _getSpeedToUse. Defaulting to calculated speed.`);
+      return data.speed;
+    }
+
+    // Use sensor speed if configured and available
+    if (config.speed_source === 'sensor') {
+      if (!data.speed_sensor) {
+        this._log(`[Debug] Speed sensor configured but no sensor entity available. Falling back to calculated speed.`);
+        return data.speed;
+      }
+      
+      const sensorSpeed = parseFloat(data.speed_sensor.state);
+      if (!isNaN(sensorSpeed) && isFinite(sensorSpeed)) {
+        // Convert sensor speed to standard format
+        const speedData = {
+          speed_kmh: sensorSpeed,
+          speed_mph: sensorSpeed * 0.621371,
+          source: 'sensor'
+        };
+        this._log(`[Debug] Using sensor speed: ${sensorSpeed} km/h (source: ${data.speed_sensor.entity_id || 'unknown'})`);
+        return speedData;
+      } else {
+        this._log(`[Warning] Invalid sensor speed value: "${data.speed_sensor.state}" from sensor ${data.speed_sensor.entity_id || 'unknown'}. Falling back to calculated speed.`);
+      }
+    }
+
+    // Default to calculated speed
+    if (data.speed) {
+      this._log(`[Debug] Using calculated speed: ${data.speed.speed_kmh.toFixed(1)} km/h (source: calculated)`);
+    } else {
+      this._log(`[Debug] No calculated speed available`);
+    }
+    return data.speed;
   }
 
   /**
@@ -140,11 +191,12 @@ export class EntityDataFetcher {
     // We use optional chaining and strict equality to ensure we only enter this block
     // if the user explicitly selected 'speed_predicted'
     if (config?.activity_source === 'speed_predicted') {
-      if (data.speed && data.speed.speed_kmh !== null && data.speed.speed_kmh !== undefined) {
+      const selectedSpeed = this._getSpeedToUse(data, config);
+      if (selectedSpeed && selectedSpeed.speed_kmh !== null && selectedSpeed.speed_kmh !== undefined) {
         // Use stable predicted activity with hysteresis
-        const activity = this._getStablePredictedActivity(entityId, data.speed.speed_kmh);
+        const activity = this._getStablePredictedActivity(entityId, selectedSpeed.speed_kmh);
         if (activity) {
-          this._log(`Activity for ${entityId}: predicted(${activity}) - speed available`);
+          this._log(`Activity for ${entityId}: predicted(${activity}) - speed available (${selectedSpeed.source})`);
           return activity;
         } else {
           // Activity is stabilizing, use last predicted activity if available
@@ -206,7 +258,7 @@ export class EntityDataFetcher {
           entity_picture: pictureUrl
         },
         activity: this._getActivityToUse(data, entityId, config),
-        speed: data.speed || null,
+        speed: this._getSpeedToUse(data, config),
         predicted_activity: data.predicted_activity || null
       };
     }

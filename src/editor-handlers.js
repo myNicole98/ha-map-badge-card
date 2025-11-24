@@ -15,6 +15,7 @@ export class EditorHandlers {
     this._attachBorderRadiusListeners(element, config, onChange);
     this._attachMarkerSizeListener(element, config, onChange);
     this._attachActivitySourceListener(element, config, onChange);
+    this._attachSpeedSourceListener(element, config, onChange);
     this._attachEntityListeners(element, config, onChange, onRender);
     this._attachZoneListeners(element, config, onChange, onRender);
     this._attachActivityListeners(element, config, onChange);
@@ -42,6 +43,19 @@ export class EditorHandlers {
   static _attachActivitySourceListener(element, config, onChange) {
     element.querySelector('#activity_source')?.addEventListener('selected', (e) => {
       config.activity_source = e.target.value;
+      onChange();
+    });
+  }
+
+  /**
+   * Attaches speed source listener
+   * @param {HTMLElement} element - Root element
+   * @param {Object} config - Configuration object
+   * @param {Function} onChange - Callback when config changes
+   */
+  static _attachSpeedSourceListener(element, config, onChange) {
+    element.querySelector('#speed_source')?.addEventListener('selected', (e) => {
+      config.speed_source = e.target.value;
       onChange();
     });
   }
@@ -178,7 +192,7 @@ export class EditorHandlers {
 
     // Add entity button
     element.querySelector('#add-entity')?.addEventListener('click', () => {
-      config.entities.push({ person: '', activity: '' });
+      config.entities.push({ person: '', activity: '', speed: '' });
       onRender();
       onChange();
     });

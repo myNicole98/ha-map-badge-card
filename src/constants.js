@@ -50,6 +50,14 @@ export const ACTIVITY_THRESHOLDS = {
 };
 
 /**
+ * Speed source options for configuration
+ */
+export const SPEED_SOURCE_OPTIONS = {
+  calculated: 'Calculated from location updates',
+  sensor: 'Direct from speed sensor'
+};
+
+/**
  * Default zone configurations
  */
 export const DEFAULT_ZONES = {
@@ -72,6 +80,7 @@ export const DEFAULT_CONFIG = {
   marker_size: 'medium',
   use_predicted_activity: false,
   activity_source: 'sensor',
+  speed_source: 'calculated', // 'calculated' or 'sensor' - maintains backward compatibility
   debug: false,
   zones: DEFAULT_ZONES,
   activities: {}
